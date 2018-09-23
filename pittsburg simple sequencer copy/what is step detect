@@ -1,0 +1,1 @@
+You basicly connect this to the unused pin of a stereo jack. This way if you connect a mono jack to the stereo socket, it will short the unused pin to ground and the arduino will notice that and switch to a voltage controlled ammount of steps instead of the knob.
