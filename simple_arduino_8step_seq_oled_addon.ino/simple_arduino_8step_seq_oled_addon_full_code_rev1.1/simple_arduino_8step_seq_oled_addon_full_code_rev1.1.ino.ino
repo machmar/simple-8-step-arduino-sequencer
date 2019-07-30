@@ -1,9 +1,9 @@
 //#include <Wire.h>
-#include <EEPROM.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#include <Rotary.h>
-#include <OneButton.h>
+#include <EEPROM.h> //included with arduino IDE
+#include <Adafruit_GFX.h> //https://github.com/adafruit/Adafruit-GFX-Library
+#include <Adafruit_SSD1306.h> //https://github.com/adafruit/Adafruit_SSD1306
+#include <Rotary.h> //https://github.com/brianlow/Rotary
+#include <OneButton.h> //https://github.com/mathertel/OneButton
 
 Adafruit_SSD1306 display(128, 64, &Wire, 60);
 Rotary rotary = Rotary(16, 3);
