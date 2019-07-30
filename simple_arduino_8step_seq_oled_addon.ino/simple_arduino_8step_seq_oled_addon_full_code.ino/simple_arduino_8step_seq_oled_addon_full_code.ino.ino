@@ -1,4 +1,5 @@
-#include <Wire.h>
+//#include <Wire.h>
+#include <EEPROM.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Rotary.h>
@@ -17,10 +18,21 @@ OneButton button(14, true);
 #define muxA 10
 #define muxB 11
 #define muxC 12
+#define flipCVpin 9//used as a led disable pin rn
+#define flopCVpin 8
+#define flipINVpin 6
+#define flopINVpin 7
+#define gateOutpin 5
 
 #define mspf 50
+#define screenSaverTimeout 15000
+#define screenSaverRenew 300000
 
 long prevMill0;
+long prevMill1;
+long prevMill2;
+long prevMillG1;
+long prevMillG2;
 bool normalClick;
 
 int mainMenuSel;
@@ -29,12 +41,11 @@ int stpLSel;
 int stpLBline;
 int stpTSel;
 int stpTBline;
-int numSteps = 7;
 
 int clkDiv = 1;
 int gateOut = 0;
 int Direction = 0;
-int numStepsCircle;
+int stepCountCircle;
 int stpL1 = 1;
 int stpL2 = 1;
 int stpL3 = 1;
@@ -43,6 +54,15 @@ int stpL5 = 1;
 int stpL6 = 1;
 int stpL7 = 1;
 int stpL8 = 1;
+int stpL1Var = 0;
+int stpL2Var = 0;
+int stpL3Var = 0;
+int stpL4Var = 0;
+int stpL5Var = 0;
+int stpL6Var = 0;
+int stpL7Var = 0;
+int stpL8Var = 0;
+int stpLnowVar = 0;
 int stpT1 = 1;
 int stpT2 = 1;
 int stpT3 = 1;
@@ -51,6 +71,7 @@ int stpT5 = 1;
 int stpT6 = 1;
 int stpT7 = 1;
 int stpT8 = 1;
+int stpTnow = 1;
 int stpT1Div = 1;
 int stpT2Div = 1;
 int stpT3Div = 1;
@@ -59,9 +80,15 @@ int stpT5Div = 1;
 int stpT6Div = 1;
 int stpT7Div = 1;
 int stpT8Div = 1;
+int flipCV = 1;
+int flopCV = 0;
+int flipINV = 1;
+int flopINV = 0;
 
+int stepNumberVirtual = 0;
 int stepNumber = 0;
 int stepCount = 8;
+int stepCountLast = 0;
 int clockVar = 0;
 int lastClock = 1;
 int clockDetectVar = 1;
@@ -73,6 +100,12 @@ int resetVar = 0;
 int holdVar = 0;
 int holdStage = 0;
 int lastStep = 0;
+int screenSaverState = 0;
+int gateClockSense = 0;
+
+bool stpT3now;
+int direction2Var;
+int stepKnobInLast;
 
 void mux(int muxBin) {
   if  (muxBin == 0) {
@@ -128,56 +161,173 @@ void mux(int muxBin) {
 void clockSense() {
   clockVar = digitalRead(clockIn);
 
-  if (clockVar == 0 && lastClock == 0) {
-    stepNumber++;
+  if (clockVar == 1 && lastClock == 0) {
+    if (stepNumber == 0) {
+      stpL1Var++;
+      if (stpL1Var == stpL1) {
+        moveSequence();
+        stpL1Var = 0;
+      }
+      stpTnow = stpT1;
+      stpLnowVar = stpL1Var;
+      //if (gateClockSense == 0 && stpTnow == 3 && stpLnowVar == 0) gateClockSense = 1;
+    }
+    if (stepNumber == 1) {
+      stpL2Var++;
+      if (stpL2Var == stpL2) {
+        moveSequence();
+        stpL2Var = 0;
+      }
+      stpTnow = stpT2;
+      stpLnowVar = stpL2Var;
+    }
+    if (stepNumber == 2) {
+      stpL3Var++;
+      if (stpL3Var == stpL3) {
+        moveSequence();
+        stpL3Var = 0;
+      }
+      stpTnow = stpT3;
+      stpLnowVar = stpL3Var;
+    }
+    if (stepNumber == 3) {
+      stpL4Var++;
+      if (stpL4Var == stpL4) {
+        moveSequence();
+        stpL4Var = 0;
+      }
+      stpTnow = stpT4;
+      stpLnowVar = stpL4Var;
+    }
+    if (stepNumber == 4) {
+      stpL5Var++;
+      if (stpL5Var == stpL5) {
+        moveSequence();
+        stpL5Var = 0;
+      }
+      stpTnow = stpT5;
+      stpLnowVar = stpL5Var;
+    }
+    if (stepNumber == 5) {
+      stpL6Var++;
+      if (stpL6Var == stpL6) {
+        moveSequence();
+        stpL6Var = 0;
+      }
+      stpTnow = stpT6;
+      stpLnowVar = stpL6Var;
+    }
+    if (stepNumber == 6) {
+      stpL7Var++;
+      if (stpL7Var == stpL7) {
+        moveSequence();
+        stpL7Var = 0;
+      }
+      stpTnow = stpT7;
+      stpLnowVar = stpL7Var;
+    }
+    if (stepNumber == 7) {
+      stpL8Var++;
+      if (stpL8Var == stpL8) {
+        moveSequence();
+        stpL8Var = 0;
+      }
+      stpTnow = stpT8;
+      stpLnowVar = stpL8Var;
+    }
     lastClock = 1;
+    /*if (stpTnow == 2 ) */gateClockSense = 1;
+    /* Serial.print(stpL1Var);
+      Serial.print(" , ");
+      Serial.print(stpL2Var);
+      Serial.print(" , ");
+      Serial.print(stpL3Var);
+      Serial.print(" , ");
+      Serial.print(stpL4Var);
+      Serial.print(" , ");
+      Serial.print(stpL5Var);
+      Serial.print(" , ");
+      Serial.print(stpL6Var);
+      Serial.print(" , ");
+      Serial.print(stpL7Var);
+      Serial.print(" , ");
+      Serial.println(stpL8Var);*/
+
   }
-  if (clockVar == 1 && lastClock == 1) {
+  if (clockVar == 0 && lastClock == 1) {
     stepCheck = 1;
     lastClock = 0;
   }
-  if (stepNumber >= stepCount) stepNumber = 0;
+  if (Direction == 0 && stepNumberVirtual >= stepCount) stepNumberVirtual = 0;
+  if (Direction == 1 && stepNumberVirtual <= -1) stepNumberVirtual = stepCount - 1;
+  if (Direction == 2) {
+    if (direction2Var == 0 && stepNumberVirtual >= stepCount - 1) direction2Var = 1;
+    if (direction2Var == 1 && stepNumberVirtual < 1) direction2Var = 0;
+  }
+  if (stepNumberVirtual < 8) stepNumber = stepNumberVirtual;
+  if (stepNumberVirtual > 7) stepNumber = (stepNumberVirtual - 8);
 }
 
 void resetSense() {
   resetVar = digitalRead(resetIn);
   if (resetVar == 1) {
-    stepNumber = 0;
+    stepNumberVirtual = 0;
   }
 }
 
+void moveSequence() {
+  if (Direction == 0) stepNumberVirtual++;
+  if (Direction == 1) stepNumberVirtual--;
+  if (Direction == 2) {
+    if (direction2Var == 0) stepNumberVirtual++;
+    if (direction2Var == 1) stepNumberVirtual--;
+  }
+  if (Direction == 3) stepNumberVirtual = random(0, stepCount);
+}
+
 void sequencerEngine() {
+  unsigned long curMill = millis();
   hold();
-    clockSense();
-    mux(stepNumber);
-    resetSense();
-    if (stepDetectVar == 1) {
-      stepKnobVar = analogRead(stepKnobIn);
-      stepCount = map(stepKnobVar, 0, 1023, 1, 9);
-    }
-    if (stepDetectVar == 0) {
-      stepCvVar = analogRead(stepCvIn);
-      stepCount = map(stepCvVar, 0, 1023, 1, 9);
-    }
+  clockSense();
+  mux(stepNumber);
+  resetSense();
+  stepKnobVar = analogRead(stepKnobIn);
+  if (digitalRead(stepDetectIn) == 1 && stepKnobVar / 9 != stepKnobInLast) {
+    if (stepKnobVar > 1006 && stepKnobVar < 1007) stepCount = 8;
+    if (stepKnobVar > 895 && stepKnobVar < 1005) stepCount = 8;
+    if (stepKnobVar < 894 && stepKnobVar > 765) stepCount = 7;
+    if (stepKnobVar < 764 && stepKnobVar > 622) stepCount = 6;
+    if (stepKnobVar < 621 && stepKnobVar > 495) stepCount = 5;
+    if (stepKnobVar < 494 && stepKnobVar > 360) stepCount = 4;
+    if (stepKnobVar < 359 && stepKnobVar > 206) stepCount = 3;
+    if (stepKnobVar < 205 && stepKnobVar > 40) stepCount = 2;
+    if (stepKnobVar < 39) stepCount = 1;
+    stepKnobInLast = stepKnobVar / 9;
+    showdisp();
+  }
+  if (digitalRead(stepDetectIn) == 0) {
+    stepCvVar = analogRead(stepCvIn);
+    stepCount = map(stepCvVar, 0, 1023, 1, 8);
+  }
+  /*if (stepCountLast != stepCount) {
+    screenSaverState = 0;
+    prevMill1 = curMill;
+  }*/
 }
 
 void hold() {
   holdVar = digitalRead(holdIn);
-  if (holdStage == 0) {
-    if (holdVar == 1) {
-      lastStep = stepNumber;
-      holdStage = 1;
-    }
+  if (holdVar == 0) {
+    lastStep = stepNumberVirtual;
   }
-  if (holdStage == 1) {
-    if (holdVar == 1) {
-      stepNumber = lastStep;
-    }
-    else holdStage = 0;
+
+  if (holdVar == 1) {
+    stepNumberVirtual = lastStep;
   }
 }
 
 void rotate() {
+  unsigned long curMill = millis();
   unsigned char result = rotary.process();
   if (screenSelect == 0) {
     if (result == DIR_CW) {
@@ -198,7 +348,7 @@ void rotate() {
       if (clkDiv == 0) clkDiv = 1;
       if (clkDiv == 51) clkDiv = 50;
     }
-    if (mainMenuSel == 1) {
+    if (mainMenuSel == 2) {
       if (result == DIR_CW) {
         if (stpLSel == 0) stpL1++;
         if (stpLSel == 1) stpL2++;
@@ -235,7 +385,7 @@ void rotate() {
       if (stpL8 == 0) stpL8 = 1;
       if (stpL8 == 31) stpL8 = 30;
     }
-    if (mainMenuSel == 2) {
+    if (mainMenuSel == 1) {
       if (result == DIR_CW) {
         gateOut++;
       } else if (result == DIR_CCW) {
@@ -292,13 +442,17 @@ void rotate() {
     }
     if (mainMenuSel == 5) {
       if (result == DIR_CW) {
-        numSteps++;
+        stepCount++;
       } else if (result == DIR_CCW) {
-        numSteps--;
+        stepCount--;
       }
-      if (numSteps == -1) numSteps = 0;
-      if (numSteps == 8) numSteps = 7;
+      if (stepCount == 0) stepCount = 1;
+      if (stepCount == 17) stepCount = 16;
     }
+  }
+  if (result == DIR_CW || result == DIR_CCW){
+    screenSaverRST();
+    showdisp();
   }
 }
 
@@ -312,23 +466,153 @@ void singleClick() {
     return;
     }
     }*/
-  if (screenSelect == 1 && mainMenuSel == 1)stpLSel++;
+  if (screenSelect == 1 && mainMenuSel == 2)stpLSel++;
   if (screenSelect == 1 && mainMenuSel == 3)stpTSel++;
-  if (screenSelect == 0) screenSelect = 1;
+  if (screenSelect == 0 && screenSaverState != 2) screenSelect = 1;
+  screenSaverRST();
+}
+
+void screenSaverRST() {
+  //unsigned long curMill = millis();
+  //prevMill1 = curMill;
+  screenSaverState = 0;
 }
 
 void doubleClick() {
   screenSelect = 0;
+  screenSaverRST();
+}
+
+void save() {
+  EEPROM.write(1, stpT1);
+  EEPROM.write(2, stpT2);
+  EEPROM.write(3, stpT3);
+  EEPROM.write(4, stpT4);
+  EEPROM.write(5, stpT5);
+  EEPROM.write(6, stpT6);
+  EEPROM.write(7, stpT7);
+  EEPROM.write(8, stpT8);
+  EEPROM.write(9, clkDiv);
+  EEPROM.write(10, gateOut);
+  EEPROM.write(11, Direction);
+  EEPROM.write(12, stpL1);
+  EEPROM.write(13, stpL2);
+  EEPROM.write(14, stpL3);
+  EEPROM.write(15, stpL4);
+  EEPROM.write(16, stpL5);
+  EEPROM.write(17, stpL6);
+  EEPROM.write(18, stpL7);
+  EEPROM.write(19, stpL8);
+  EEPROM.write(20, stepCount);
+  display.clearDisplay();
+  display.setCursor(0, 20);
+  display.setTextSize(4);
+  display.setTextColor(WHITE);
+  display.println("SAVED");
+  display.display();
+  delay(40);
+  display.clearDisplay();
+  display.setTextSize(1);
+  
+}
+
+void fliopwrite()  {
+  flopCV = !flipCV;
+  flopINV = !flipINV;
+  digitalWrite(flipCVpin, flipCV);
+  digitalWrite(flopCVpin, flopCV);
+  digitalWrite(flipINVpin, flipINV);
+  digitalWrite(flopINVpin, flopINV);
 }
 
 void showdisp() {
-  unsigned long curMill = millis();
-  if (curMill - prevMill0 >= mspf) {
-    prevMill0 = curMill;
+ // unsigned long curMill = millis();
+ // if (curMill - prevMill0 >= mspf) {
+   // prevMill0 = curMill;
     display.display();
     display.clearDisplay();
-  }
+  //}
+  Serial.println("screen refreshed");
 }
+
+// 'machmodules logo, 127x64px
+const unsigned char Mach_Modules_logo [] PROGMEM = {
+  // 'machmodules logo, 127x64px
+  0xf0, 0x00, 0x7f, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x01, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x01, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x01, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x01, 0xe0, 0x00, 0x0f, 0x80, 0x00, 0x7c, 0x03, 0xe0, 0x1e, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x03, 0xe0, 0x00, 0x0f, 0xc0, 0x01, 0xfe, 0x03, 0xe0, 0x1e, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x03, 0xe0, 0x00, 0x1f, 0xc0, 0x03, 0x83, 0x00, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x03, 0xc0, 0x00, 0x1c, 0x00, 0x06, 0x01, 0x80, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x07, 0xc0, 0x00, 0x1c, 0x00, 0x0c, 0x00, 0xc0, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x07, 0xc0, 0x00, 0x18, 0x00, 0x08, 0x00, 0x40, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x07, 0xc0, 0x00, 0x38, 0x00, 0x18, 0x00, 0x60, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x07, 0x80, 0x00, 0x38, 0x00, 0x10, 0x00, 0x20, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x07, 0x80, 0x00, 0x38, 0x00, 0x10, 0x00, 0x20, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x07, 0x80, 0x00, 0x30, 0x80, 0x20, 0x00, 0x10, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x07, 0x80, 0x00, 0x70, 0x80, 0x20, 0x00, 0x10, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x07, 0x00, 0x00, 0x70, 0x80, 0x20, 0x00, 0x00, 0x3f, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x03, 0x00, 0x00, 0x60, 0x80, 0x20, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x03, 0x00, 0x00, 0xe0, 0xc0, 0x20, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x03, 0x00, 0x00, 0xe0, 0xc0, 0x20, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x02, 0x00, 0x00, 0xe0, 0xc0, 0x20, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x00, 0x00, 0xc0, 0x40, 0x20, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x00, 0x01, 0xc0, 0x60, 0x20, 0x00, 0x00, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x00, 0x01, 0xc3, 0xe0, 0x20, 0x01, 0xf0, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x00, 0x01, 0xc0, 0x00, 0x20, 0x00, 0x10, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x00, 0x01, 0x80, 0x00, 0x20, 0x00, 0x10, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x00, 0x03, 0x80, 0x00, 0x10, 0x00, 0x20, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x00, 0x03, 0x80, 0x00, 0x10, 0x00, 0x20, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x00, 0x03, 0x80, 0x30, 0x08, 0x00, 0x40, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x00, 0x03, 0x00, 0x30, 0x08, 0x00, 0x40, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x00, 0x07, 0x00, 0x10, 0x04, 0x00, 0x80, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x00, 0x07, 0x00, 0x18, 0x02, 0x01, 0x00, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x00, 0x07, 0x00, 0x18, 0x02, 0x01, 0x00, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x00, 0x07, 0x80, 0x0e, 0x01, 0xfe, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x00, 0x00, 0x08, 0x00, 0x08, 0x00, 0x00, 0x10, 0x07, 0x0f, 0x00, 0x01, 0xf0, 0x0e,
+  0x80, 0x00, 0x00, 0x00, 0x30, 0x00, 0x08, 0x00, 0x00, 0x10, 0x07, 0x0f, 0x00, 0x01, 0xe0, 0x06,
+  0x80, 0x00, 0x00, 0x00, 0x60, 0x00, 0x08, 0x00, 0x00, 0x10, 0x07, 0x0f, 0x00, 0x01, 0xc0, 0x06,
+  0x80, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x08, 0x00, 0x00, 0x10, 0x07, 0x0f, 0x00, 0x01, 0xc0, 0x02,
+  0x80, 0x00, 0x02, 0x00, 0xc0, 0x00, 0x08, 0x00, 0x00, 0x10, 0x07, 0x0f, 0x00, 0xff, 0x81, 0x82,
+  0x80, 0x00, 0x02, 0x01, 0x81, 0xe0, 0x08, 0x7c, 0x00, 0x10, 0x07, 0x0f, 0x00, 0xfd, 0x01, 0x80,
+  0x81, 0x00, 0x02, 0x01, 0x80, 0x78, 0x08, 0x06, 0x00, 0x10, 0x07, 0x0f, 0x00, 0xf8, 0x01, 0xc0,
+  0x81, 0x00, 0x02, 0x03, 0x80, 0x18, 0x08, 0x00, 0x10, 0x10, 0x07, 0x0f, 0x00, 0xf8, 0x01, 0xf0,
+  0x81, 0x00, 0x06, 0x03, 0x80, 0x18, 0x08, 0x00, 0x00, 0x10, 0x07, 0x0f, 0x00, 0xf8, 0x01, 0xf0,
+  0x81, 0x00, 0x06, 0x03, 0x00, 0x0c, 0x08, 0x00, 0x00, 0x10, 0x07, 0x0f, 0x00, 0xf8, 0x00, 0x70,
+  0x81, 0x80, 0x06, 0x03, 0x00, 0x0c, 0x08, 0x00, 0x08, 0x10, 0x07, 0x0f, 0x00, 0x00, 0x00, 0x1c,
+  0x81, 0x80, 0x06, 0x03, 0x00, 0x0c, 0x08, 0x00, 0x08, 0x10, 0x07, 0x0f, 0x00, 0x01, 0xe0, 0x0e,
+  0x81, 0x80, 0x06, 0x07, 0x00, 0x0c, 0x08, 0x00, 0x08, 0x10, 0x07, 0x0f, 0x00, 0x01, 0xe0, 0x06,
+  0x81, 0x80, 0x0e, 0x07, 0x00, 0x04, 0x08, 0x00, 0x08, 0x10, 0x07, 0x0f, 0x00, 0x01, 0xf0, 0x02,
+  0x81, 0xc0, 0x0e, 0x07, 0x00, 0x04, 0x08, 0x00, 0x08, 0x10, 0x07, 0x0f, 0x00, 0xff, 0xf0, 0x02,
+  0x81, 0xc0, 0x0e, 0x07, 0x80, 0x0c, 0x08, 0x00, 0x08, 0x10, 0x07, 0x0f, 0x00, 0xff, 0xf0, 0x02,
+  0x81, 0xc0, 0x0e, 0x03, 0x80, 0x08, 0x08, 0x00, 0x08, 0x10, 0x07, 0x0f, 0x00, 0xff, 0xf0, 0x00,
+  0x81, 0xc0, 0x1e, 0x03, 0x80, 0x08, 0x08, 0x00, 0x18, 0x10, 0x07, 0x0f, 0x00, 0xf8, 0x00, 0x00,
+  0x81, 0xe0, 0x1e, 0x03, 0x80, 0x00, 0x08, 0x00, 0x10, 0x00, 0x07, 0x0f, 0x00, 0xf8, 0x00, 0x00,
+  0x81, 0xe0, 0x1e, 0x03, 0xc0, 0x00, 0x08, 0x00, 0x10, 0x00, 0x0f, 0x0f, 0x00, 0x78, 0x00, 0x00,
+  0x81, 0xe0, 0x1e, 0x03, 0xc0, 0x00, 0x08, 0x00, 0x30, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x80,
+  0x81, 0xe0, 0x1e, 0x01, 0xe0, 0x00, 0x08, 0x00, 0x70, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x81, 0xe0, 0x1e, 0x01, 0xf0, 0x01, 0x08, 0x00, 0x60, 0x00, 0x1e, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x81, 0xf0, 0x1e, 0x00, 0xf0, 0x02, 0x08, 0x00, 0xe0, 0x80, 0x3c, 0x00, 0x30, 0x01, 0xf0, 0x06,
+  0x81, 0xf0, 0x1e, 0x00, 0xfc, 0x04, 0x08, 0x01, 0xc0, 0x40, 0x7c, 0x00, 0x30, 0x01, 0xf8, 0x0e,
+  0x81, 0xfc, 0x1f, 0xc0, 0x7f, 0xfc, 0x0f, 0xff, 0x7f, 0xc0, 0x07, 0xe0, 0x03, 0x00, 0x07, 0x00
+};
+
+// 'M logo', 13x42px
+const unsigned char M_logo [] PROGMEM = {
+  0xf0, 0x78, 0xf0, 0x78, 0xf0, 0x78, 0xf0, 0x78, 0xf0, 0x78, 0xf8, 0xf8, 0xf8, 0xf8, 0xf8, 0xf8,
+  0xf8, 0xf8, 0xf8, 0xf8, 0xf8, 0xf8, 0xfd, 0xf8, 0xfd, 0xf8, 0xfd, 0xf8, 0xfd, 0xf8, 0xfd, 0xf8,
+  0xff, 0xf8, 0xff, 0xf8, 0xff, 0xf8, 0xff, 0xf8, 0xff, 0xf8, 0xff, 0xf8, 0xff, 0xf8, 0xff, 0xf8,
+  0xff, 0xf8, 0xff, 0xf8, 0xff, 0xf8, 0xff, 0xf8, 0xff, 0xf8, 0xff, 0xf8, 0xff, 0xf8, 0xef, 0xb8,
+  0xef, 0xb8, 0xef, 0xb8, 0xef, 0xb8, 0xef, 0xb8, 0xef, 0xb8, 0xe7, 0x38, 0xe7, 0x38, 0xe7, 0x38,
+  0xe7, 0x38, 0xe7, 0x38
+};
 
 // 'looping arrow bitmap', 128x44px
 const unsigned char looping_arrow [] PROGMEM = {
@@ -533,50 +817,62 @@ void setup() {
   pinMode(clockIn, INPUT_PULLUP);
   pinMode(clockDetectIn, INPUT_PULLUP);
   pinMode(stepDetectIn, INPUT_PULLUP);
-  //attachInterrupt(digitalPinToInterrupt(clockIn), sequencerEngine, CHANGE);
+  attachInterrupt(0, clockSense, CHANGE);
   /*attachInterrupt(digitalPinToInterrupt(1), rotate, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(0), rotate, CHANGE);*/
-  attachInterrupt(1, rotate, CHANGE);
-  attachInterrupt(0, rotate, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(0), rotate, CHANGE);*/
+  attachInterrupt(digitalPinToInterrupt(3), rotate, CHANGE);
+  attachInterrupt(1, screenSaverRST, CHANGE);
   button.attachClick(singleClick);
   button.attachDoubleClick(doubleClick);
-
+  button.attachLongPressStart(save);
   display.clearDisplay();
-  display.setTextSize(2);
-  display.setTextColor(WHITE);
-  display.setTextWrap(false);
-  delay(100);
-  display.println("MachmarMachmar");
-  display.display();
-  delay(100);
-  display.println("MachmarMachmar");
-  display.display();
-  delay(50);
-  display.println("MachmarMachmar");
-  display.display();
-  delay(100);
-  display.println("MachmarMachmar");
+  display.drawBitmap(0, 0, Mach_Modules_logo, 128, 64, WHITE);
   display.display();
   delay(200);
   display.setTextSize(1);
+  display.setTextColor(WHITE);
   for (int i = 0; i < 72; i++) {
     display.drawCircle(64, 32, i, WHITE);
     display.fillCircle(64, 32, i - 1, BLACK);
     display.display();
-    mux(i);
+    mux(i / 9);
     delay(2);
   }
   display.clearDisplay();
+  //#####################LOADING##########BEGINING##########
+  stpT1 = EEPROM.read(1);
+  stpT2 = EEPROM.read(2);
+  stpT3 = EEPROM.read(3);
+  stpT4 = EEPROM.read(4);
+  stpT5 = EEPROM.read(5);
+  stpT6 = EEPROM.read(6);
+  stpT7 = EEPROM.read(7);
+  stpT8 = EEPROM.read(8);
+  clkDiv = EEPROM.read(9);
+  gateOut = EEPROM.read(10);
+  Direction = EEPROM.read(11);
+  stpL1 = EEPROM.read(12);
+  stpL2 = EEPROM.read(13);
+  stpL3 = EEPROM.read(14);
+  stpL4 = EEPROM.read(15);
+  stpL5 = EEPROM.read(16);
+  stpL6 = EEPROM.read(17);
+  stpL7 = EEPROM.read(18);
+  stpL8 = EEPROM.read(19);
+  stepCount = EEPROM.read(20);
+  //#####################LOADING##########END###############
+  Serial.begin(2000000);
 }
 
 void loop() {
+  unsigned long curMill = millis();
   sequencerEngine();
   rotate();
   button.tick();
   if (mainMenuSel <= 0) {//clock divisions
     display.setTextSize(2);
     display.setCursor(0, 0);
-    display.println("Clock Div");
+    display.println("Gate Lengh");
     display.setTextSize(6);
     if (clkDiv <= 9) {
       display.setCursor(49, 19);
@@ -587,7 +883,40 @@ void loop() {
       display.print(clkDiv);
     }
   }
-  if (mainMenuSel == 1) {//step lenght
+  if (mainMenuSel == 1) {//gate out
+    display.setTextSize(2);
+    display.setCursor(0, 0);
+    display.println("Gate Out");
+    if (gateOut <= 0) {
+      display.setTextSize(6);
+      display.setCursor(10, 19);
+      display.print("OFF");
+      flipCV = 1;
+      flipINV = 1;
+    }
+    if (gateOut == 1) {
+      display.drawCircle(64, 38, 17, WHITE);
+      display.setTextSize(2);
+      display.setCursor(0, 30);
+      display.print("INV");
+      display.setCursor(88, 30);
+      display.print("OUT");
+      flipCV = 1;
+      flipINV = 0;
+    }
+    if (gateOut >= 2) {
+      display.drawCircle(64, 38, 17, WHITE);
+      display.setTextSize(2);
+      display.setCursor(0, 30);
+      display.print("CV");
+      display.setCursor(88, 30);
+      display.print("OUT");
+      flipCV = 0;
+      flipINV = 1;
+    }
+    fliopwrite();
+  }
+  if (mainMenuSel == 2) {//step lenght
     display.setTextSize(2);
     display.setCursor(0, 0);
     display.println("Step Lengh");
@@ -620,32 +949,6 @@ void loop() {
     display.drawLine(stpLBline + 1, 63, stpLBline + 14, 63, WHITE);
     stpLBline = map(stpLSel, 0, 7, 0, 112);
     if (stpLSel >= 8) stpLSel = 0;
-  }
-  if (mainMenuSel == 2) {//gate out
-    display.setTextSize(2);
-    display.setCursor(0, 0);
-    display.println("Gate Out");
-    if (gateOut <= 0) {
-      display.setTextSize(6);
-      display.setCursor(10, 19);
-      display.print("OFF");
-    }
-    if (gateOut == 1) {
-      display.drawCircle(64, 38, 17, WHITE);
-      display.setTextSize(2);
-      display.setCursor(0, 30);
-      display.print("INV");
-      display.setCursor(88, 30);
-      display.print("OUT");
-    }
-    if (gateOut >= 2) {
-      display.drawCircle(64, 38, 17, WHITE);
-      display.setTextSize(2);
-      display.setCursor(0, 30);
-      display.print("CV");
-      display.setCursor(88, 30);
-      display.print("OUT");
-    }
   }
   if (mainMenuSel == 3) {//gate type
     display.setTextSize(2);
@@ -772,22 +1075,75 @@ void loop() {
     display.setTextSize(2);
     display.setCursor(0, 0);
     display.println("Seq Lenght");
-    numStepsCircle = map(numSteps, 0, 7, 9, 22);
-    display.fillCircle(0, 40, numStepsCircle, WHITE);
-    display.fillCircle(128, 40, numStepsCircle, WHITE);
-    display.setCursor(64 - numStepsCircle, 39 - numStepsCircle);
-    display.setTextSize(numSteps + 1);
-    display.println(numSteps + 1);
-    //display.setCursor(79, 39-numStepsCircle);
-    //display.println(numSteps + 1);
+    stepCountCircle = map(stepCount, 1, 8, 9, 22);
+    display.fillCircle(0, 40, stepCountCircle, WHITE);
+    display.fillCircle(128, 40, stepCountCircle, WHITE);
+    if (stepCount <= 8) display.setCursor(64 - stepCountCircle, 39 - stepCountCircle);
+    if (stepCount >= 9) display.setCursor(36, 22);
+    if (stepCount <= 8) display.setTextSize(stepCount);
+    if (stepCount >= 9) display.setTextSize(4);
+    display.println(stepCount);
     display.setTextColor(WHITE);
     display.setTextSize(2);
   }
-  if (screenSelect == 0) {//screen selesct line-top
+  if (screenSelect == 0) {//screen select line-top
     display.drawLine(0, 15, 128, 15, WHITE);
   }
   if (screenSelect == 1) {//screen selesct line-bottom
     display.drawLine(0, 16, 128, 16, WHITE);
   }
-  showdisp();
+
+  if (screenSaverState == 0) {
+    prevMill1 = curMill;
+    screenSaverState = 1;
+  }
+  if (screenSaverState == 1) {
+    if (curMill - prevMill1  >= screenSaverTimeout) {
+      prevMill1 = curMill;
+      display.clearDisplay();
+      display.drawBitmap(random(0, 115), random(0, 22), M_logo, 13, 42, WHITE);
+      showdisp();
+      prevMill2 = curMill;
+      screenSaverState = 2;
+      screenSelect = 0;
+    }
+    //else showdisp();
+  }
+  if (screenSaverState == 2) {
+    if (curMill - prevMill2  >= screenSaverRenew) {
+      prevMill2 = curMill;
+      display.clearDisplay();
+      display.drawBitmap(random(0, 115), random(0, 22), M_logo, 13, 42, WHITE);
+      showdisp();
+    }
+  }
+  if (stpTnow == 1 ) gateClockSense = 1;
+  if /*(stpTnow == 2)*/(gateClockSense == 1) {
+    if (stpTnow == 2 ) {
+      if (curMill - prevMillG1 >= clkDiv * 10) {
+        prevMillG1 = curMill;
+        gateClockSense = 0;
+      }
+    } 
+  }
+  if (stpTnow == 3 ) {
+    //if (curMill - prevMillG2 < clkDiv * 10 && stpLnowVar == 0) gateClockSense = 1;
+    if (curMill - prevMillG2 >= clkDiv * 10 && stpT3now == 0) {
+      prevMillG2 = curMill;
+      gateClockSense = 0;
+      stpT3now = 1;
+    }
+    //if (gateClockSense == 0 && stpLnowVar == 0) prevMillG2 = curMill;
+    /*if (stpLnowVar != 0) {
+      gateClockSense = 0;
+      prevMillG2 = curMill;
+    }*/
+    if (stpLnowVar == 0 && stpT3now != 0) stpT3now = 0;
+  }
+  
+  if (stpTnow == 4 ) gateClockSense = 0;
+  if (gateClockSense == 0) prevMillG1 = curMill;
+  //Serial.println(gateClockSense);
+  digitalWrite(gateOutpin, gateClockSense);
+  digitalWrite(flipCVpin, !gateClockSense);
 }
