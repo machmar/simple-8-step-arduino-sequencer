@@ -1,5 +1,5 @@
 # simple-8-step-arduino-sequencer
-A simple eurorack 8step sequencer with a variable lenght and two CV outputs(one of them is reversed). All can be controlled by CV.
+A simple eurorack 8step sequencer with a variable lenght and two CV outputs(one of them is reversed). All can be controlled by CV. Also use the code without the OLED.
 
 Animations:
           Unplug the clock pin.  
